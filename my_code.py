@@ -1,5 +1,3 @@
-from select import select
-from unicodedata import category
 import pandas as pd
 import mysql
 import mysql.connector
@@ -88,18 +86,8 @@ df_old_HDD.to_sql(name='old_hdd', con=motor, if_exists='append', index=False)
 
 """
 
-#preguntas que hacer para los query
-#cuales peliculas tienen mejores special features y es mas barato para alquilar para sacarle mas provecho
-#que actores actuan mas en cada categoria
-#que actor actua en peliculas donde el alquiler es el mas bajo
-#que pelicula puedes alquiler por el maximo de tiempo
-#que peliculas puedes alquilar en que idioma
-#que pelicula se alquila mas
-#que actor esta en la pelicula donde se alquila mas
-#que pelicula le genera mas dinero a la tienda
-#
-#
-#join hdd con category,   
+
+  
 
 
 cursor.execute('select * from rental;') #mysql method
@@ -131,12 +119,117 @@ order by old_hdd.title;
 '''
 df_old_actor_category= pd.read_sql(join_old_hdd_actors_category, motor)
 print('las peliculas con cada actor y categoria de la pelicula ')
-print(df_old_actor_category)
+#print(df_old_actor_category.head())
+
+join_films_language= '''
+select language.language_id, language.name, films.title, films.rental_rate, films.rental_duration
+from language
+inner join films
+on language.language_id = films.language_id
+group by title
+order by films.rental_duration desc;
+'''
+df_films_language=  pd.read_sql(join_films_language, motor)
+#print(df_films_language.head())
+
+join_films_invenotry= '''
+select store_id,count(inventory.store_id)
+from films
+join inventory
+on films.film_id = inventory.film_id
+join rental 
+on rental.inventory_id= inventory.inventory_id
+group by store_id;
+'''
+df_films_rental= pd.read_sql(join_films_invenotry,motor)
+#print(df_films_rental.head())
+
+join_films_inventroy_rental='''
+SELECT rating, count(title)
+FROM (select films.replacement_cost,rental.customer_id,films.title, films.rating  
+from films
+join inventory
+on films.film_id = inventory.film_id
+join rental 
+on rental.inventory_id= inventory.inventory_id) as d
+group by rating
+having count(title)> 40
+order by rating desc;
+'''
+
+df_films_rental_inventory=pd.read_sql(join_films_inventroy_rental, motor)
+#print(df_films_rental_inventory)
+
+cre_tbl='''
+create temporary table new_tbl
+select films.*,inventory.inventory_id,inventory.store_id, rental.staff_id, rental.customer_id, rental.rental_id
+from films
+join inventory
+on films.film_id = inventory.film_id
+join rental 
+on rental.inventory_id= inventory.inventory_id;
+'''
+
+#cre_tbl2= pd.read_sql(cre_tbl, motor)
+#print(cre_tbl2.head)
+
+call_temp='''
+select *
+from new_tbl;
+'''
+#call_temp2= pd.read_sql(call_temp,motor)
+#print(call_temp2) aunque la tabla se crea en mysql all salir del parametro se cae y no es llamable ojo que si hay metodos para llamrlo
 
 
+mega_join='''
+select category.name, films.title, films.rating, inventory.store_id, rental.return_date
+from films
+join old_hdd
+on old_hdd.title= films.title
+join category
+on category.category_id= old_hdd.category_id
+join inventory
+on films.film_id= inventory_id
+join rental
+on inventory.inventory_id= rental.inventory_id 
+group by title
+order by name;'''
+
+mega_join2= pd.read_sql(mega_join, motor)
+print(mega_join2.head())
+
+price_per_day='''
+select films.title, films.rental_rate, films.rental_duration, rental.inventory_id, sum(films.rental_rate/films.rental_duration)as price_per_day
+from films
+join inventory
+on films.film_id= inventory.film_id
+join rental
+on rental.inventory_id= inventory.inventory_id
+group by inventory.inventory_id
+order by price_per_day desc;'''
+
+df_price_per_day= pd.read_sql(price_per_day, motor)
+print(df_price_per_day.head())
 
 
+all_join='''
+select actors.first_name, actors.last_name, inventory.store_id, films.title, films.release_year 
+from films
+join old_hdd
+on old_hdd.title= films.title
+join category
+on category.category_id= old_hdd.category_id
+join inventory
+on films.film_id= inventory_id
+join rental
+on inventory.inventory_id= rental.inventory_id 
+join actors
+on actors.last_name = old_hdd.last_name and actors.first_name = old_hdd.first_name
+group by title
+order by name;'''
 
+df_all= pd.read_sql(all_join, motor)
+print(df_all.head())
 
 
 
